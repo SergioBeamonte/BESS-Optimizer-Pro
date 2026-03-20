@@ -154,6 +154,7 @@ See the [LICENSE](LICENSE) file or contact the author for details.
 ## 👤 Author
 
 **Sergio Beamonte González**
+
 2026
 
 ---
