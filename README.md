@@ -6,9 +6,12 @@
   <p align="center">
     <a href="#-quick-start">Quick Start</a> •
     <a href="#-features">Features</a> •
-    <a href="#-architecture">Architecture</a> •
+    <a href="#-data-pipeline">Data Pipeline</a> •
     <a href="#-models">Models</a> •
     <a href="#-license">License</a>
+  </p>
+  <p align="center">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/e/ed/Red_El%C3%A9ctrica_logo_2022.svg" alt="Redeia Logo" width="200">
   </p>
 </p>
 
@@ -16,7 +19,7 @@
 
 ## 📋 Overview
 
-**Eco-Optimizer BESS** is an interactive Streamlit dashboard that connects the full pipeline from **real-time electricity market data ingestion** (REE API) through **multi-model time series forecasting** to **optimal battery arbitrage scheduling** using Linear Programming.
+**Eco-Optimizer BESS** is an interactive Streamlit dashboard that connects the full pipeline from **real-time electricity market data ingestion** (Red Eléctrica de España (Actual Redeia) API) through **multi-model time series forecasting** to **optimal battery arbitrage scheduling** using Linear Programming.
 
 Built as part of an MSc Data Science Time Series project, it demonstrates how a Battery Energy Storage System (BESS) can maximize arbitrage profit by buying electricity when prices are low and selling when prices are high — all driven by AI-powered price predictions.
 
@@ -48,7 +51,7 @@ Or simply **double-click `start.bat`** on Windows.
 ## ✨ Features
 
 ### 📥 Tab 1 — Historical Data Explorer
-- **Live REE API integration** — Downloads hourly price, demand, and generation data from Red Eléctrica de España
+- **Live REE API integration** — Downloads hourly price, demand, and generation data from Red Eléctrica de España (Actual Redeia)
 - **Interactive time series charts** with Plotly (dark theme, zoomable, hover tooltips)
 - **Daily energy mix pie charts** showing the percentage breakdown by technology (solar, wind, nuclear, etc.)
 - **Temporal range slider** for quick zooming into specific periods
@@ -69,31 +72,8 @@ Or simply **double-click `start.bat`** on Windows.
 - **Price source selection** — Optimize using real historical prices or any model's predictions from Tab 2
 - **Financial results dashboard**: Arbitrage Profit (€), Total Energy Charged/Discharged (MWh)
 - **Dual-panel visualization**: Market prices (top) + Charge/Discharge bars with SoC curve (bottom)
+## 🏗 Data Pipeline
 
-## 🏗 Architecture
-
-```
-Eco-Optimizer-BESS/
-│
-├── dashboard.py              # Main Streamlit application (3 tabs)
-├── start.bat                 # Windows launcher script
-├── requirements.txt          # Python dependencies
-│
-├── src/
-│   └── data_ingestion.py     # REE API client (prices, generation, demand)
-│
-├── models/                   # Standalone model scripts (for reference / CLI usage)
-│   ├── 01_sarima.py
-│   ├── 02_varima.py
-│   ├── 03_xgboost_sota.py
-│   ├── 04_lstm_sota.py
-│   └── 05_bess_optimizer.py
-│
-└── data/
-    └── raw/                  # Downloaded CSVs (auto-generated, git-ignored)
-```
-
-### Data Pipeline
 
 ```mermaid
 graph LR
@@ -112,7 +92,7 @@ graph LR
 | # | Model | Type | Description |
 |---|-------|------|-------------|
 | 01 | **Naive (Daily Mean)** | Statistical | Predicts the average of the last 24h as a baseline |
-| 02 | **Seasonal Naive** | Statistical | Repeats the last 24h cycle ($y_{t+96} = y_t$) |
+| 02 | **Seasonal Naive** | Statistical | Repeats the last 24h cycle ($y_{t+24} = y_t$) |
 | 03 | **Holt-Winters** | Exp. Smoothing | Classical decomposition with trend + 24h seasonality |
 | 04 | **SARIMA** | Statistical (Seasonal) | Seasonal ARIMA with 24h periodicity |
 | 05 | **VARIMA** | Statistical (Multivariate) | Auto-VARIMA: ADF/AIC optimized multivariate system |
@@ -130,9 +110,11 @@ The dashboard fetches data from three REE endpoints:
 - **Demand**: `apidatos.ree.es/es/datos/demanda/evolucion` (hourly)
 
 > **Note**: REE's generation endpoint only returns daily totals. The system synthesizes realistic hourly profiles using a demand-proportional weighting algorithm that distributes daily generation across hours following the actual load curve.
+> 
+> **Important API Limitation**: Although some endpoints mention granular data, current public API access does not provide real-time quarter-hourly (15-min) data for all variables. The system resamples available data to a consistent hourly frequency. We will remain attentive to any updates or new endpoints that may enable native quarter-hourly optimization.
 
 ### BESS Optimization Formulation
-The LP problem maximizes:
+The LP (Linear Programming) problem maximizes:
 
 $$\text{Profit} = \sum_{t=0}^{T} \left( p_t \cdot P_d^t - p_t \cdot P_c^t \right) \cdot \Delta t$$
 
@@ -165,13 +147,17 @@ Each model is evaluated using:
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is available under a **Dual License** model:
+
+- **Open Source:** Licensed under the **GNU General Public License v3.0 (GPLv3)**. This allows for free use, modification, and redistribution for open-source and academic purposes.
+- **Commercial:** A separate **Commercial License** is required for use in proprietary or closed-source products. 
+
+See the [LICENSE](LICENSE) file or contact the author for details.
 
 ## 👤 Author
 
 **Sergio Beamonte González**
-MSc Data Science — Time Series Analysis
-Universidad Politécnica de Madrid • 2026
+2026
 
 ---
 
