@@ -4,13 +4,36 @@ import xgboost as xgb
 
 def create_features(df, target_var):
     df_feat = df.copy()
+    
+    # Features de tiempo
     df_feat['hour'] = df_feat.index.hour
     df_feat['dayofweek'] = df_feat.index.dayofweek
+    
     n = len(df)
-    if n > 96:
-        df_feat['lag_24h'] = df_feat[target_var].shift(96)
-    if n > 96*7:
-        df_feat['lag_1w'] = df_feat[target_var].shift(96*7)
+    
+    # 🔹 Lags cortos 
+    short_lags = [1, 2, 3, 6, 12]
+    for lag in short_lags:
+        if n > lag:
+            df_feat[f'lag_{lag}'] = df_feat[target_var].shift(lag)
+    
+    # 🔹 Lags diarios
+    daily_lags = [24, 48, 72]
+    for lag in daily_lags:
+        if n > lag:
+            df_feat[f'lag_{lag}h'] = df_feat[target_var].shift(lag)
+    
+    # 🔹 Lags semanales
+    weekly_lags = [24*7, 24*14]
+    for lag in weekly_lags:
+        if n > lag:
+            df_feat[f'lag_{lag//24}d'] = df_feat[target_var].shift(lag)
+            
+    # 🔹 Lag anual      
+    annual_lag = 24 * 365
+    if n > annual_lag:
+        df_feat['lag_annual'] = df_feat[target_var].shift(annual_lag)
+    
     return df_feat
 
 def forecast_xgboost(df_full, target_var, steps_ahead):

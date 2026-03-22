@@ -4,7 +4,7 @@ def forecast_seasonal_naive(series, steps_ahead):
     """
     Seasonal Naive forecast (24h periodicity).
     """
-    seasonal_period = 96
+    seasonal_period = 24
     if len(series) < seasonal_period:
         return np.full(steps_ahead, series.iloc[-1])
         

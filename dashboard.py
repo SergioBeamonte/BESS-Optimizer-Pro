@@ -19,13 +19,14 @@ from data_ingestion import fetch_mercado_trinidad
 
 from model_01_naive_mean import forecast_naive_mean
 from model_02_seasonal_naive import forecast_seasonal_naive
-from model_03_holt_winters import forecast_holt_winters
-from model_04_sarima import forecast_sarima
+from model_03_sarima import forecast_sarima
+from model_04_sarimax import forecast_sarimax
 from model_05_varima import forecast_varima
-from model_06_random_forest import forecast_random_forest
-from model_07_xgboost import forecast_xgboost
-from model_08_chronos import forecast_chronos
-from model_09_bess_optimizer import run_bess_optimization
+from model_06_holt_winters import forecast_holt_winters
+from model_07_random_forest import forecast_random_forest
+from model_08_xgboost import forecast_xgboost
+from model_09_chronos import forecast_chronos
+from bess_optimizer import run_bess_optimization
 
 # --- STYLES --- (Clean Professional Style)
 st.markdown("""
@@ -121,11 +122,8 @@ with tab1:
                 progress_bar.empty()
                 
                 # Compute Total Generation by summing all technology columns
-                gen_cols = [c for c in df.columns if c not in ['precio_mwh', 'demanda']]
-                if len(gen_cols) > 0:
-                    df['generacion_total'] = df[gen_cols].sum(axis=1)
-                else:
-                    df['generacion_total'] = df['demanda']  # Fallback
+                if "generación_total" in df.columns:
+                    df = df.rename(columns={"generación_total": "generacion_total"})
                     
                 st.session_state.df_hist = df
                 
@@ -187,6 +185,7 @@ with tab1:
                     dia_elegido = st.select_slider("Select day for pie chart:", options=list(dias_unicos))
                     
                     df_dia = df_filtered[df_filtered.index.date == dia_elegido]
+                    df_dia = df_dia[gen_cols]
                     totales_dia = df_dia[gen_cols].sum()
                     
                     # Filter technologies contributing less than 1%
@@ -222,12 +221,13 @@ with tab2:
             todas_opciones_ml = [
                 "01. Naive (Daily Mean)",
                 "02. Seasonal Naive (24h)",
-                "03. Exponential Smoothing (Holt-Winters)",
-                "04. SARIMA (Seasonal)", 
+                "03. SARIMA (Autofit)", 
+                "04. SARIMAX (Multivariate)", 
                 "05. VARIMA (Multivariate)", 
-                "06. Random Forest", 
-                "07. XGBoost", 
-                "08. Amazon Chronos T5"
+                "06. Exponential Smoothing (Holt-Winters)",
+                "07. Random Forest", 
+                "08. XGBoost", 
+                "09. Amazon Chronos T5"
             ]
             selected_model = st.selectbox("ML Algorithm:", todas_opciones_ml, help="Select the forecasting engine that will try to predict the hold-out set.")
             target_var_sel = st.selectbox("🎯 Target variable:", ['precio_mwh', 'demanda', 'generacion_total'], format_func=lambda x: {'precio_mwh': 'Price (EUR/MWh)', 'demanda': 'Demand (MW)', 'generacion_total': 'Total Generation (MWh)'}[x])
@@ -247,36 +247,41 @@ with tab2:
                 else:
                     target_vars = [target_var_sel]
                     
-                    # Auto-VARIMA: automatic (p, d) selection
-                    # Uses ADF test for differencing order, AIC for lag order
                     if "VARIMA" in selected_model:
-                        from statsmodels.tsa.stattools import adfuller
-                        
-                        var_cols = ['generacion_total', 'demanda', 'precio_mwh']
-                        raw_train = df_train[var_cols].iloc[:-steps_ahead]
-                        
-                        # 1. Auto-detect differencing order d via ADF test
-                        #    Apply the minimum d that makes ALL series stationary (p < 0.05)
-                        best_d = 0
-                        work_data = raw_train.copy()
-                        for d_candidate in range(3):  # test d=0, 1, 2
-                            all_stationary = True
-                            for col in var_cols:
-                                adf_pval = adfuller(work_data[col].dropna(), maxlag=48)[1]
-                                if adf_pval > 0.05:
-                                    all_stationary = False
-                                    break
-                            if all_stationary:
-                                best_d = d_candidate
-                                break
-                            work_data = work_data.diff().dropna()
+                        y_pred, diag = forecast_varima(df_train, target_var_sel, steps_ahead)
+                        if "fallback" in diag:
+                            st.warning(f"VARIMA Fallback: {diag['fallback']}")
                         else:
-                            best_d = 2  # fallback
-                            work_data = raw_train.diff().diff().dropna()
+                            st.info(f"Auto-VARIMA selected: **p={diag.get('best_p',0)}, d={diag.get('best_d',0)}**")
                         
-                    if "VARIMA" in selected_model:
-                        y_pred, best_p, best_d = forecast_varima(df_train, target_var_sel, steps_ahead)
-                        st.info(f"Auto-VARIMA selected: **p={best_p}, d={best_d}**")
+                        with st.expander("📊 Model Justification & Metrics"):
+                            if "vars_used" in diag:
+                                st.write(f"Series used: {', '.join(diag['vars_used'])}")
+                            if "aic" in diag:
+                                st.write(f"**AIC:** {diag['aic']:.2f}")
+                            if "summary_snippet" in diag:
+                                st.markdown("---")
+                                st.write("**VAR Model Summary Snippet:**")
+                                st.code(diag["summary_snippet"])
+                        
+                        key = f"{selected_model}_{target_var_sel}"
+                        st.session_state.dict_preds[key] = pd.Series(y_pred, index=df_train.index[-steps_ahead:])
+                        
+                        y_true = df_train[target_var_sel].iloc[-steps_ahead:]
+                        mae = np.mean(np.abs(y_true - y_pred))
+                        rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+                        mape = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-6))) * 100
+                        st.session_state.metrics_list.append({"Model": selected_model, "Variable": target_var_sel, "Horizon": horizon_options[horizonte], "MAE": mae, "RMSE": rmse, "MAPE": mape})
+                    elif "SARIMAX" in selected_model:
+                        y_pred, diag = forecast_sarimax(df_train, target_var_sel, steps_ahead)
+                        with st.expander("🔍 SARIMAX Details"):
+                            st.write(f"Exogenous variables used: {', '.join(diag.get('exog_used', []))}")
+                            if "order" in diag:
+                                st.write(f"**Detected Order:** {diag['order']} x {diag.get('seasonal_order')}")
+                                st.write(f"**AIC:** {diag.get('aic',0):.2f}")
+                            if "fallback" in diag:
+                                st.warning(diag["fallback"])
+                        
                         key = f"{selected_model}_{target_var_sel}"
                         st.session_state.dict_preds[key] = pd.Series(y_pred, index=df_train.index[-steps_ahead:])
                         
@@ -306,7 +311,13 @@ with tab2:
                                 elif "Naive (Daily Mean)" in selected_model:
                                     y_pred = forecast_naive_mean(y_tr_sub, steps_ahead)
                                 elif "SARIMA" in selected_model:
-                                    y_pred = forecast_sarima(y_tr_sub, steps_ahead)
+                                    y_pred, diag = forecast_sarima(y_tr_sub, steps_ahead)
+                                    with st.expander("📈 SARIMA Autofit Diagnostics"):
+                                        st.write(f"**Stationarity Tests (Target):**")
+                                        st.write(f"- ADF: {'Pass' if diag.get('adf_stationary') else 'Fail'} (p={diag.get('adf_p',0):.4f})")
+                                        st.write(f"- KPSS: {'Pass' if diag.get('kpss_stationary') else 'Fail'} (p={diag.get('kpss_p',0):.4f})")
+                                        st.write(f"**Detected Order:** {diag.get('order')} x {diag.get('seasonal_order')}")
+                                        st.write(f"**AIC:** {diag.get('aic', 0):.2f}")
                                 elif "Holt-Winters" in selected_model:
                                     y_pred = forecast_holt_winters(y_tr_sub, steps_ahead)
                                 elif "XGBoost" in selected_model:

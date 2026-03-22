@@ -58,7 +58,7 @@ Or simply **double-click `start.bat`** on Windows.
 - **Progress bar** during data download with real-time status updates
 
 ### 🔮 Tab 2 — Multi-Model Forecasting Lab
-- **7 forecasting algorithms** to compare head-to-head on the same hold-out set
+- **9 forecasting algorithms** to compare head-to-head on the same hold-out set (7 advanced + 2 baselines)
 - **Per-variable prediction** — Choose to forecast Price, Demand, or Generation independently
 - **Persistent session storage** — Run models one-by-one; results accumulate in the comparison table
 - **Dynamic metrics table** showing Status (⏳ Pending / ✅ Completed), MAE, RMSE, and MAPE
@@ -91,15 +91,16 @@ graph LR
 
 | # | Model | Type | Description |
 |---|-------|------|-------------|
-| 01 | **Naive (Daily Mean)** | Statistical | Predicts the average of the last 24h as a baseline |
+| 01 | **Naive Mean** | Statistical | Predicts the historical mean as a simple baseline |
 | 02 | **Seasonal Naive** | Statistical | Repeats the last 24h cycle ($y_{t+24} = y_t$) |
-| 03 | **Holt-Winters** | Exp. Smoothing | Classical decomposition with trend + 24h seasonality |
-| 04 | **SARIMA** | Statistical (Seasonal) | Seasonal ARIMA with 24h periodicity |
-| 05 | **VARIMA** | Statistical (Multivariate) | Auto-VARIMA: ADF/AIC optimized multivariate system |
-| 06 | **Random Forest** | Bagging Ensemble | Parallel trees with adaptive feature selection |
-| 07 | **XGBoost** | Gradient Boosting | Ensemble of trees with adaptive feature selection |
-| 08 | **Amazon Chronos T5** | Foundation Model | Pre-trained transformer for zero-shot forecasting |
-| 09 | **BESS Optimizer** | Linear Programming | Optimal buy/sell schedule via LP Arbitrage (PuLP) |
+| 03 | **SARIMA** | Statistical (Seasonal) | Auto-SARIMA with automated order selection |
+| 04 | **SARIMAX** | Multivariate | SARIMA with exogenous variables (Demand/Generation) |
+| 05 | **VARIMA** | Vector Model | VARMAX (p=1, q=1) multivariate integrated system |
+| 06 | **Holt-Winters** | Exp. Smoothing | Triple Exponential Smoothing (Trend + Seasonality) |
+| 07 | **Random Forest** | Bagging Ensemble | Ensemble of trees with lagged features |
+| 08 | **XGBoost** | Gradient Boosting | Optimized tree boosting for time series |
+| 09 | **Amazon Chronos T5** | Foundation Model | Pre-trained transformer for zero-shot forecasting |
+| 10 | **BESS Optimizer** | Linear Programming | Optimal buy/sell schedule via LP Arbitrage (PuLP) |
 
 ## 🔧 Technical Details
 
