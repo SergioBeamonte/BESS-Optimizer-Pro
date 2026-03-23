@@ -10,8 +10,7 @@ def forecast_sarimax(df_full, target_var, steps_ahead):
     """
     # 1. Feature Selection (K=3 to keep it robust for small datasets)
     all_num_cols = df_full.select_dtypes(include=[np.number]).columns.tolist()
-    redundant = ['generacion_total', 'generación_total']
-    candidate_cols = [c for c in all_num_cols if c not in redundant and c != target_var]
+    candidate_cols = [c for c in all_num_cols if  c != target_var]
     
     # Select top 3 correlated features
     corrs = df_full[candidate_cols].corrwith(df_full[target_var]).abs().sort_values(ascending=False)
